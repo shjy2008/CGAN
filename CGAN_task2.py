@@ -62,12 +62,14 @@ cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits = True)
 class CGAN(tf.keras.Model):
     """Conditional Generative Adversarial Network"""
 
-    def __init__(self, **kwargs):
+    def __init__(self, num_classes, latent_dim = 100, **kwargs):
         super(CGAN, self).__init__(**kwargs)
-        self.gen_input_dim = 100
+        self.num_classes = num_classes
+        self.latent_dim = latent_dim
+        
         self.generator = tf.keras.Sequential(
             [
-                tf.keras.layers.InputLayer(input_shape = (self.gen_input_dim, )),
+                tf.keras.layers.InputLayer(input_shape = (self.latent_dim + self.num_classes, )),
                 tf.keras.layers.Dense(7*7*256),
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.ReLU(),
@@ -84,6 +86,7 @@ class CGAN(tf.keras.Model):
 
         self.discriminator = tf.keras.Sequential(
             [
+                tf.keras.layers.InputLayer(input_shape = (28, 28, 1 + self.num_classes)),
                 tf.keras.layers.Conv2D(64, 5, strides = 2, padding = 'same', input_shape = [28, 28, 1]),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.Dropout(0.3),
@@ -103,15 +106,14 @@ class CGAN(tf.keras.Model):
         
     
 class CGAN_trainer():
-    def __init__(self, train_images, gen_input_dim = 100, batch_size = 256):
-        self.cgan = CGAN(gen_input_dim)
+    def __init__(self, train_images, train_labels, num_classes, latent_dim = 100, batch_size = 256):
+        self.cgan = CGAN(num_classes, latent_dim)
+        self.num_classes = num_classes
+        self.latent_dim = latent_dim
         self.generator_optimizer = tf.keras.optimizers.Adam(1e-4)
         self.discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
-        self.gen_input_dim = gen_input_dim
-        self.num_examples_to_generate = 16
-        self.seed = tf.random.normal([self.num_examples_to_generate, self.gen_input_dim])
         self.batch_size = batch_size
-        self.dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(train_images.shape[0]).batch(self.batch_size)
+        self.dataset = tf.data.Dataset.from_tensor_slices((train_images, train_labels)).shuffle(train_images.shape[0]).batch(self.batch_size)
         self.num_batches = train_images.shape[0] // self.batch_size
     
     def discriminator_loss(self, real_output, fake_output):
@@ -125,14 +127,25 @@ class CGAN_trainer():
         return fake_loss
     
     @tf.function
-    def train_step(self, images):
-        noise = tf.random.normal([self.batch_size, self.gen_input_dim])
+    def train_step(self, images, labels):
+        noise = tf.random.normal([images.shape[0], self.latent_dim])
+        labels_one_hot = tf.one_hot(labels, self.num_classes)
+
+        generator_input = tf.concat([noise, labels_one_hot], axis = 1)
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            generated_images = self.cgan.generator(noise, training = True)
+            generated_images = self.cgan.generator(generator_input, training = True)
+                        
+            # Reshape labels to match image dimensions
+            labels_channel = tf.reshape(labels_one_hot, [-1, 1, 1, self.num_classes])  # [batch_size, 1, 1, num_classes]
+            labels_channel = tf.tile(labels_channel, [1, 28, 28, 1])  # Tile to [batch_size, 28, 28, num_classes]
 
-            real_output = self.cgan.discriminator(images, training = True)
-            fake_output = self.cgan.discriminator(generated_images, training = True)
+            # Concatenate images and labels along the channel dimension
+            real_images_with_labels = tf.concat([images, labels_channel], axis=-1)
+            fake_images_with_labels = tf.concat([generated_images, labels_channel], axis=-1)
+
+            real_output = self.cgan.discriminator(real_images_with_labels, training = True)
+            fake_output = self.cgan.discriminator(fake_images_with_labels, training = True)
 
             gen_loss = self.generator_loss(fake_output)
             disc_loss = self.discriminator_loss(real_output, fake_output)
@@ -156,8 +169,8 @@ class CGAN_trainer():
 
             gen_loss = 0
             disc_loss = 0
-            for image_batch in self.dataset:
-                gl, dl = self.train_step(image_batch)
+            for image_batch, label_batch in self.dataset:
+                gl, dl = self.train_step(image_batch, label_batch)
                 gen_loss += gl
                 disc_loss += dl
             
@@ -182,12 +195,19 @@ class CGAN_trainer():
         # self.generate_and_save_images(epochs)
     
     def generate_and_save_images(self, epoch):
-        predictions = self.cgan.generator(self.seed, training = False)
+        num_examples = 24
+        noise = tf.random.normal([num_examples, self.latent_dim])
+        labels = tf.constant(list(range(num_examples)))
+        labels_one_hot = tf.one_hot(labels, self.num_classes)
+        generator_input = tf.concat([noise, labels_one_hot], axis=1)
+        predictions = self.cgan.generator(generator_input, training = False)
 
-        fig = plt.figure(figsize = (4, 4))
+        fig = plt.figure(figsize = (6, 4))
         for i in range(predictions.shape[0]):
-            plt.subplot(4, 4, i + 1)
+            plt.subplot(6, 4, i + 1)
             plt.imshow(predictions[i, :, :, 0], cmap = 'gray')
+            plt.title(index_to_letter(i))
+            plt.axis("off")
         
         plt.savefig('image_at_epoch_{:04d}.png'.format(epoch))
         # plt.show()
@@ -205,7 +225,7 @@ class CGAN_trainer():
         self.cgan = tf.keras.models.load_model(MODEL_SAVE_PATH)
 
 
-cgan = CGAN_trainer(x_train)
+cgan = CGAN_trainer(x_train, y_train, NUM_CLASSES)
 cgan.train(epochs = 50)
 
 
