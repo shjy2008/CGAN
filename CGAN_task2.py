@@ -8,13 +8,15 @@ import os
 from IPython import display
 
 # ------- Please modify this ----------
-is_training = False # Set to True if want to train
-generate_letter = 'C' # Valid value: ABCDEFGHIKLMNOPQRSTUVWXY (No J and Z)
+is_training = True # Set to True if want to train
+generate_letter = 'A' # Valid value: ABCDEFGHIKLMNOPQRSTUVWXY (No J and Z)
 #--------------------------------------
 
 MODEL_SAVE_PATH = "myModel_task2.keras"
 
 NUM_CLASSES = 24 # only 24 letters, except J and Z
+
+LATENT_DIM = 100
 
 all_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # 26 letters
 letters = "ABCDEFGHIKLMNOPQRSTUVWXY" # only 24 letters, except J and Z
@@ -62,14 +64,16 @@ cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits = True)
 class CGAN(tf.keras.Model):
     """Conditional Generative Adversarial Network"""
 
-    def __init__(self, num_classes, latent_dim = 100, **kwargs):
+    def __init__(self, **kwargs):
         super(CGAN, self).__init__(**kwargs)
-        self.num_classes = num_classes
-        self.latent_dim = latent_dim
+        self.num_classes = NUM_CLASSES
+        self.latent_dim = LATENT_DIM
+
+        add_dimension = self.num_classes if self.num_classes > 2 else 1 # If only 2 classes, only need to add one dimension
         
         self.generator = tf.keras.Sequential(
             [
-                tf.keras.layers.InputLayer(input_shape = (self.latent_dim + self.num_classes, )),
+                tf.keras.layers.InputLayer(input_shape = (self.latent_dim + add_dimension, )),
                 tf.keras.layers.Dense(7*7*256),
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.ReLU(),
@@ -81,12 +85,49 @@ class CGAN(tf.keras.Model):
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.Conv2DTranspose(1, 5, strides = 2, padding = 'same', activation = 'sigmoid')     
+
+
+                # tf.keras.layers.InputLayer(shape=(self.latent_dim + add_dimension,)),
+                # tf.keras.layers.Dense(units=7*7*self.latent_dim, activation=tf.nn.relu),
+                # tf.keras.layers.Reshape(target_shape=(7, 7, self.latent_dim)),
+                # tf.keras.layers.Conv2DTranspose(
+                #     filters=128, kernel_size=3, strides=2, padding='same', activation='relu'),
+                # tf.keras.layers.BatchNormalization(),
+                # tf.keras.layers.Conv2DTranspose(
+                #     filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
+                # # tf.keras.layers.Conv2DTranspose(
+                # #     filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
+                # # No activation
+                # tf.keras.layers.Conv2DTranspose(
+                #     filters=1, kernel_size=3, strides=1, padding='same', activation = 'tanh'),
+
+                # # https://www.tensorflow.org/tutorials/generative/dcgan
+                # tf.keras.layers.Dense(units=7*7*256, use_bias=False, input_shape=(self.latent_dim + add_dimension,)),
+                # tf.keras.layers.BatchNormalization(),
+                # tf.keras.layers.LeakyReLU(),
+
+                # tf.keras.layers.Reshape((7, 7, 256)),
+                # # Output shape: (batch_size, 7, 7, 256)
+                
+                # tf.keras.layers.Conv2DTranspose(filters=256, kernel_size=(5, 5), strides=(1, 1), padding='same', use_bias=False),
+                # # Output shape: (batch_size, 7, 7, 256)
+                # tf.keras.layers.BatchNormalization(),
+                # tf.keras.layers.LeakyReLU(),
+
+                # tf.keras.layers.Conv2DTranspose(filters=128, kernel_size=(5, 5), strides=(2, 2), padding='same', use_bias=False),
+                # # Output shape: (batch_size, 14, 14, 128)
+                # tf.keras.layers.BatchNormalization(),
+                # tf.keras.layers.LeakyReLU(),
+
+                # tf.keras.layers.Conv2DTranspose(filters=1, kernel_size=(5, 5), strides=(2, 2), padding='same', use_bias=False, activation='tanh'),
+                # # Output shape: (batch_size, 28, 28, 1)
+
             ]
         )
 
         self.discriminator = tf.keras.Sequential(
             [
-                tf.keras.layers.InputLayer(input_shape = (28, 28, 1 + self.num_classes)),
+                tf.keras.layers.InputLayer(input_shape = (28, 28, 1 + add_dimension)),
                 tf.keras.layers.Conv2D(64, 5, strides = 2, padding = 'same', input_shape = [28, 28, 1]),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.Dropout(0.3),
@@ -95,19 +136,50 @@ class CGAN(tf.keras.Model):
                 tf.keras.layers.Dropout(0.3),
                 tf.keras.layers.Flatten(),
                 tf.keras.layers.Dense(1)
+
+
+                # tf.keras.layers.InputLayer(shape=(28, 28, 1 + add_dimension)),
+                # # tf.keras.layers.Conv2D(
+                # #     filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
+                # # tf.keras.layers.BatchNormalization(),
+                # tf.keras.layers.Conv2D(
+                #     filters=64, kernel_size=3, strides=(2, 2), activation='relu'),
+                # # tf.keras.layers.BatchNormalization(),
+                # tf.keras.layers.Dropout(0.3),
+                # tf.keras.layers.Conv2D(
+                #     filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
+                # # tf.keras.layers.BatchNormalization(),
+                # tf.keras.layers.Dropout(0.3),
+                # tf.keras.layers.Flatten(),
+                # # No activation
+                # # tf.keras.layers.Dense(self.latent_dim + self.latent_dim),
+                # tf.keras.layers.Dense(1),
+
+                # https://www.tensorflow.org/tutorials/generative/dcgan
+                # tf.keras.layers.Conv2D(filters=128, kernel_size=(5, 5), strides=(2, 2), padding='same', input_shape=[28, 28, 1 + add_dimension]),
+                # tf.keras.layers.LeakyReLU(),
+                # tf.keras.layers.Dropout(0.3),
+
+                # tf.keras.layers.Conv2D(filters=256, kernel_size=(5, 5), strides=(2, 2), padding='same'),
+                # tf.keras.layers.LeakyReLU(),
+                # tf.keras.layers.Dropout(0.3),
+
+                # tf.keras.layers.Flatten(),
+                # tf.keras.layers.Dense(1),
             ]
         )
 
-        @tf.function
-        def sample(self, eps = None):
-            if eps == None:
-                eps = tf.random.normal(shape = (100, self.latent_dim))
-            return self.generator(eps, training = False)
-        
+    @tf.function
+    def sample(self, labels):
+        noise = tf.random.normal(shape = (len(labels), self.latent_dim))
+        labels_one_hot = tf.one_hot(labels, self.num_classes)
+        generator_input = tf.concat([noise, labels_one_hot], axis = 1)
+        generated_images = self.generator(generator_input, training = False)
+        return generated_images
     
 class CGAN_trainer():
     def __init__(self, train_images, train_labels, num_classes, latent_dim = 100, batch_size = 256):
-        self.cgan = CGAN(num_classes, latent_dim)
+        self.cgan = CGAN()
         self.num_classes = num_classes
         self.latent_dim = latent_dim
         self.generator_optimizer = tf.keras.optimizers.Adam(1e-4)
@@ -128,13 +200,13 @@ class CGAN_trainer():
     
     @tf.function
     def train_step(self, images, labels):
-        noise = tf.random.normal([images.shape[0], self.latent_dim])
+        # noise = tf.random.normal([images.shape[0], self.latent_dim])
         labels_one_hot = tf.one_hot(labels, self.num_classes)
 
-        generator_input = tf.concat([noise, labels_one_hot], axis = 1)
+        # generator_input = tf.concat([noise, labels_one_hot], axis = 1)
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            generated_images = self.cgan.generator(generator_input, training = True)
+            generated_images = self.cgan.sample(labels) #self.cgan.generator(generator_input, training = True)
                         
             # Reshape labels to match image dimensions
             labels_channel = tf.reshape(labels_one_hot, [-1, 1, 1, self.num_classes])  # [batch_size, 1, 1, num_classes]
@@ -195,22 +267,19 @@ class CGAN_trainer():
         # self.generate_and_save_images(epochs)
     
     def generate_and_save_images(self, epoch):
-        num_examples = 24
-        noise = tf.random.normal([num_examples, self.latent_dim])
+        num_examples = self.num_classes
         labels = tf.constant(list(range(num_examples)))
-        labels_one_hot = tf.one_hot(labels, self.num_classes)
-        generator_input = tf.concat([noise, labels_one_hot], axis=1)
-        predictions = self.cgan.generator(generator_input, training = False)
+        predictions = self.cgan.sample(labels)
 
-        fig = plt.figure(figsize = (6, 4))
+        fig = plt.figure(figsize = (13, 10))
         for i in range(predictions.shape[0]):
-            plt.subplot(6, 4, i + 1)
+            plt.subplot(5, 6, i + 1)
             plt.imshow(predictions[i, :, :, 0], cmap = 'gray')
             plt.title(index_to_letter(i))
             plt.axis("off")
         
         plt.savefig('image_at_epoch_{:04d}.png'.format(epoch))
-        # plt.show()
+        plt.close()
 
         # fig, ax1 = plt.subplots(1, 1, sharey = True, figsize = (10, 5))
         # ax1.plot(self.gen_losses, label = 'Generator Loss')
@@ -225,9 +294,36 @@ class CGAN_trainer():
         self.cgan = tf.keras.models.load_model(MODEL_SAVE_PATH)
 
 
-cgan = CGAN_trainer(x_train, y_train, NUM_CLASSES)
-cgan.train(epochs = 50)
+# Give a specific letter ('A', 'B', 'C', ..), generate images
+def generate_image_with_letter(letter):
+    letter = letter.upper()
+    if letter in letters:
+        myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
+        index = letter_to_index(letter)
+
+        num_examples = 24
+        generated_images = myModel.sample([index] * num_examples)
+        
+        fig = plt.figure(figsize = (13, 10))
+        for i in range(num_examples):
+            plt.subplot(5, 6, i + 1)
+            plt.imshow(generated_images[i][:, :, 0], cmap = 'gray')
+            plt.title(f"letter: {letter}")
+            plt.axis('off')
+        
+        plt.savefig(f"generated_{letter}.png")
+        plt.show()
+    else:
+        print(f"Input value invalid, please try again. Valid input: {letters}")
+    
+
+# If is training, create a trainer to train the model
+if is_training:
+    cgan = CGAN_trainer(x_train, y_train, NUM_CLASSES, LATENT_DIM)
+    cgan.train(epochs = 50)
+else: # If not, only generate images with existing model
+    generate_image_with_letter(generate_letter)
 
 
 
-# print(y_train[0], y_test[0])
+
