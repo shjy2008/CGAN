@@ -8,8 +8,8 @@ import os
 from IPython import display
 
 # ------- Please modify this ----------
-is_training = True # Set to True if want to train
-generate_letter = 'A' # Valid value: ABCDEFGHIKLMNOPQRSTUVWXY (No J and Z)
+is_training = False # Set to True if want to train
+generate_letter = 'C' # Valid value: ABCDEFGHIKLMNOPQRSTUVWXY (No J and Z)
 #--------------------------------------
 
 MODEL_SAVE_PATH = "myModel_task2.keras"
@@ -64,9 +64,9 @@ cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits = True)
 class CGAN(tf.keras.Model):
     """Conditional Generative Adversarial Network"""
 
-    def __init__(self, **kwargs):
+    def __init__(self, num_classes, **kwargs):
         super(CGAN, self).__init__(**kwargs)
-        self.num_classes = NUM_CLASSES
+        self.num_classes = num_classes
         self.latent_dim = LATENT_DIM
 
         add_dimension = self.num_classes if self.num_classes > 2 else 1 # If only 2 classes, only need to add one dimension
@@ -179,7 +179,7 @@ class CGAN(tf.keras.Model):
     
 class CGAN_trainer():
     def __init__(self, train_images, train_labels, num_classes, latent_dim = 100, batch_size = 256):
-        self.cgan = CGAN()
+        self.cgan = CGAN(num_classes)
         self.num_classes = num_classes
         self.latent_dim = latent_dim
         self.generator_optimizer = tf.keras.optimizers.Adam(1e-4)
@@ -291,14 +291,18 @@ class CGAN_trainer():
         self.cgan.save(MODEL_SAVE_PATH)
     
     def load_model(self):
-        self.cgan = tf.keras.models.load_model(MODEL_SAVE_PATH)
+        self.cgan = CGAN(num_classes=self.num_classes)
+        self.cgan.load_weights(MODEL_SAVE_PATH)
+        # self.cgan = tf.keras.models.load_model(MODEL_SAVE_PATH)
 
 
 # Give a specific letter ('A', 'B', 'C', ..), generate images
 def generate_image_with_letter(letter):
     letter = letter.upper()
     if letter in letters:
-        myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
+        # myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
+        myModel = CGAN(num_classes=NUM_CLASSES)
+        myModel.load_weights(MODEL_SAVE_PATH)
         index = letter_to_index(letter)
 
         num_examples = 24
