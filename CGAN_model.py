@@ -18,18 +18,22 @@ class ModelData:
         return ModelData.letters[index]
 
     # index: (0-23) in letters (except J and Z)
+    @staticmethod
     def letter_to_index(letter):
         return ModelData.letters.index(letter)
 
     # label: the label in the csv table, 0-24 but doesn't have 9
+    @staticmethod
     def label_to_index(label):
         return ModelData.letter_to_index(ModelData.all_letters[label])
 
     # label: the label in the csv table, 0-24 but doesn't have 9
+    @staticmethod
     def is_label_a_vowel(label):
         return ModelData.all_letters[label] in ModelData.vowels
 
     # Load the CSV file
+    @staticmethod
     def load_csv_file():
         train_data_csv = pd.read_csv('sign_mnist_train.csv')
         y_train = train_data_csv.iloc[:, 0].values
