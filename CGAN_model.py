@@ -199,7 +199,7 @@ class CGAN_trainer():
     def train_step(self, images, labels):
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
             if self.num_classes > 2:
-                labels_one_hot = tf.one_hot(labels, self.num_classes)
+                labels_one_hot = tf.one_hot(labels, self.num_classes) # [batch_size, num_classes]
                 # Reshape labels to match image dimensions
                 labels_channel = tf.reshape(labels_one_hot, [-1, 1, 1, self.num_classes])  # [batch_size, 1, 1, num_classes]
                 labels_channel = tf.tile(labels_channel, [1, 28, 28, 1])  # Tile to [batch_size, 28, 28, num_classes]
