@@ -72,7 +72,9 @@ def generate_image_with_angle(angle):
         return
     
     index = angles.index(angle)
-    myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
+    # myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
+    myModel = CGAN(num_classes=NUM_CLASSES, latent_dim=ModelData.LATENT_DIM)
+    myModel.load_weights(MODEL_SAVE_PATH)
 
     num_examples = 24
     generated_images = myModel.sample([index] * num_examples)
